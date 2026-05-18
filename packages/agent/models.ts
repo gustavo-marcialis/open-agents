@@ -4,8 +4,12 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGateway } from "ai";
 import type { LanguageModel } from "ai";
 
-// Definições exatas de tipos que o index.ts, open-agent.ts e o apps/web precisam
-export type GatewayConfig = { baseURL?: string; apiKey?: string };
+// Definições flexíveis de tipos para suportar as propriedades dinâmicas do open-agent.ts
+export type GatewayConfig = { 
+  baseURL?: string; 
+  apiKey?: string;
+  [key: string]: any; // Permite propriedades adicionais como providerOptionsOverrides
+};
 export type GatewayOptions = { headers?: Record<string, string> };
 export type GatewayModelId = string;
 export type ProviderOptionsByProvider = Record<string, any>;
