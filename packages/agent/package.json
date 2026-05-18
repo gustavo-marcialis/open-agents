@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:",
-    "@ai-sdk/google": "catalog:",
+    "@ai-sdk/google": "latest",
     "@ai-sdk/openai": "catalog:",
     "@open-agents/sandbox": "workspace:*",
     "ai": "catalog:",
