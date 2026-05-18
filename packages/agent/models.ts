@@ -4,9 +4,11 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGateway } from "ai";
 import type { LanguageModel } from "ai";
 
-// Declaração dos tipos que o index.ts está tentando exportar
+// Definições exatas de tipos que o index.ts, open-agent.ts e o apps/web precisam
 export type GatewayConfig = { baseURL?: string; apiKey?: string };
 export type GatewayOptions = { headers?: Record<string, string> };
+export type GatewayModelId = string;
+export type ProviderOptionsByProvider = Record<string, any>;
 
 export const REFLECTION_MODEL = "openai/gpt-4o-mini";
 
