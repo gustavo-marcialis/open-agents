@@ -4,6 +4,10 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGateway } from "ai";
 import type { LanguageModel } from "ai";
 
+// Declaração dos tipos que o index.ts está tentando exportar
+export type GatewayConfig = { baseURL?: string; apiKey?: string };
+export type GatewayOptions = { headers?: Record<string, string> };
+
 export const REFLECTION_MODEL = "openai/gpt-4o-mini";
 
 export function getProviderAndModelId(modelId: string) {
@@ -30,7 +34,7 @@ export function getModel(modelId: string): LanguageModel {
 
 export function gateway(
   modelId: string,
-  config?: { baseURL?: string; apiKey?: string },
+  config?: GatewayConfig,
 ): LanguageModel {
   const attributionHeaders = {
     "x-vercel-ai-attribution": "Open Agents",
