@@ -1,30 +1,19 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "tasks": {
+  "globalEnv": [
+    "AUTH_URL",
+    "GROQ_API_KEY",
+    "TAVILY_API_KEY",
+    "AGENT_SUPABASE_ACCESS_TOKEN",
+    "E2B_API_KEY",
+    "GOOGLE_GENERATIVE_AI_API_KEY",
+    "OPEN_AGENTS_RESOURCE_PROFILE",
+    "BETTER_AUTH_URL"
+  ],
+  "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "env": [
-        "BETTER_AUTH_SECRET",
-        "BLOB_READ_WRITE_TOKEN",
-        "ENCRYPTION_KEY",
-        "GITHUB_CLIENT_SECRET",
-        "JWE_SECRET",
-        "KV_REST_API_READ_ONLY_TOKEN",
-        "KV_REST_API_TOKEN",
-        "KV_REST_API_URL",
-        "KV_URL",
-        "NEXT_PUBLIC_AUTH_PROVIDERS",
-        "NEXT_PUBLIC_GITHUB_CLIENT_ID",
-        "NEXT_PUBLIC_VERCEL_APP_CLIENT_ID",
-        "POSTGRES_URL",
-        "REDIS_URL",
-        "VERCEL_APP_CLIENT_SECRET"
-      ],
-      "outputs": ["dist/**"]
-    },
-    "dev": { "cache": false, "persistent": true },
-    "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] },
-    "lint": { "dependsOn": ["^lint"], "outputs": [] },
-    "lint:fix": { "dependsOn": ["^lint:fix"], "outputs": [] }
+      "outputs": [".next/**", "!.next/cache/**"]
+    }
   }
 }
