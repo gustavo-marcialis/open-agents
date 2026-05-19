@@ -1,6 +1,6 @@
 import type { Sandbox } from "../interface";
 
-export async function connectVercel(config: any): Promise<Sandbox> {
+port async function connectVercel(config: any): Promise<Sandbox> {
   const e2bApiKey = process.env.E2B_API_KEY || process.env.NEXT_PUBLIC_E2B_API_KEY;
   
   console.log("[Sandbox Proxy] Inicializando E2B...");
