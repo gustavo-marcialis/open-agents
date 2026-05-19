@@ -10,7 +10,7 @@
     "OPEN_AGENTS_RESOURCE_PROFILE",
     "BETTER_AUTH_URL"
   ],
-  "pipeline": {
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**"]
