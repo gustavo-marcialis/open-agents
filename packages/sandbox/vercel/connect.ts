@@ -1,7 +1,9 @@
 // @ts-nocheck
 import type { Sandbox } from "../interface";
 
-export async function connectVercel(config: any): Promise<Sandbox> {
+// Adicionamos o "rest parameter" (...args: any[]) para aceitar qualquer número de argumentos
+// sem que o TypeScript cause erro de build.
+export async function connectVercel(config: any, ...args: any[]): Promise<Sandbox> {
   const e2bApiKey = process.env.E2B_API_KEY;
 
   return {
@@ -9,6 +11,7 @@ export async function connectVercel(config: any): Promise<Sandbox> {
     workingDirectory: "/home/user",
     
     executeBash: async (command: string) => {
+      // Usamos fetch nativo para falar com a API da E2B
       const res = await fetch("https://api.e2b.dev/instances/commands", {
         method: "POST",
         headers: { "Authorization": `Bearer ${e2bApiKey}`, "Content-Type": "application/json" },
