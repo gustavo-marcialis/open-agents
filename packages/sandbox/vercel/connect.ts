@@ -1,146 +1,99 @@
-import type { Sandbox, SandboxHooks } from "../interface";
-import type { VercelSandboxConfig } from "./config";
-import { VercelSandbox } from "./sandbox";
-import type { VercelState } from "./state";
+import { SandboxHooks } from "../interface";
 
-interface ConnectOptions {
-  env?: Record<string, string>;
-  githubToken?: string;
-  gitUser?: { name: string; email: string };
-  hooks?: SandboxHooks;
-  timeout?: number;
-  vcpus?: number;
-  ports?: number[];
-  baseSnapshotId?: string;
-  resume?: boolean;
-  createIfMissing?: boolean;
-  persistent?: boolean;
-  snapshotExpiration?: number;
-  skipGitWorkspaceBootstrap?: boolean;
-}
+export async function connectVercel(config: { sessionId: string }): Promise<SandboxHooks> {
+  const e2bApiKey = process.env.E2B_API_KEY;
+  const sessionId = config.sessionId;
 
-function getRemainingTimeout(
-  expiresAt: number | undefined,
-): number | undefined {
-  if (!expiresAt) {
-    return undefined;
-  }
+  console.log(`[Sandbox Proxy] Iniciando sessão transparente: ${sessionId}`);
 
-  const remaining = expiresAt - Date.now();
-  return remaining > 10_000 ? remaining : undefined;
-}
-
-function getSandboxName(state: VercelState): string | undefined {
-  if (typeof state.sandboxName === "string" && state.sandboxName.length > 0) {
-    return state.sandboxName;
-  }
-
-  if (typeof state.sandboxId === "string" && state.sandboxId.length > 0) {
-    return state.sandboxId;
-  }
-
-  return undefined;
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
-}
-
-function isSandboxNotFoundError(error: unknown): boolean {
-  const message = toErrorMessage(error).toLowerCase();
-  return message.includes("status code 404") || message.includes("not found");
-}
-
-function buildCreateConfig(
-  state: VercelState,
-  options?: ConnectOptions,
-): VercelSandboxConfig {
-  const sandboxName = getSandboxName(state);
-
-  return {
-    ...(sandboxName ? { name: sandboxName } : {}),
-    ...(state.source
-      ? {
-          source: {
-            url: state.source.repo,
-            branch: state.source.branch,
-            newBranch: state.source.newBranch,
-          },
-        }
-      : {}),
-    ...(state.snapshotId ? { restoreSnapshotId: state.snapshotId } : {}),
-    env: options?.env,
-    githubToken: options?.githubToken,
-    gitUser: options?.gitUser,
-    hooks: options?.hooks,
-    ...(options?.timeout !== undefined && { timeout: options.timeout }),
-    ...(options?.vcpus !== undefined && { vcpus: options.vcpus }),
-    ...(options?.ports && { ports: options.ports }),
-    ...(options?.baseSnapshotId && {
-      baseSnapshotId: options.baseSnapshotId,
-    }),
-    ...(options?.persistent !== undefined && {
-      persistent: options.persistent,
-    }),
-    ...(options?.snapshotExpiration !== undefined && {
-      snapshotExpiration: options.snapshotExpiration,
-    }),
-    ...(options?.skipGitWorkspaceBootstrap && {
-      skipGitWorkspaceBootstrap: true,
-    }),
-  };
-}
-
-async function connectNamedSandbox(
-  state: VercelState,
-  options?: ConnectOptions,
-): Promise<Sandbox> {
-  const sandboxName = getSandboxName(state);
-  if (!sandboxName) {
-    throw new Error("Persistent sandbox name is required");
-  }
-
-  const remainingTimeout = getRemainingTimeout(state.expiresAt);
-
-  try {
-    return await VercelSandbox.connect(sandboxName, {
-      env: options?.env,
-      githubToken: options?.githubToken,
-      hooks: options?.hooks,
-      remainingTimeout,
-      ports: options?.ports,
-      resume: options?.resume,
-    });
-  } catch (error) {
-    if (!options?.createIfMissing || !isSandboxNotFoundError(error)) {
-      throw error;
+  // 1. Criamos ou reaproveitamos uma instância na nuvem via HTTP puro
+  // Usando a API REST oficial da E2B para não precisar de instalar pacotes via terminal
+  const initInstance = async () => {
+    if (!e2bApiKey) {
+      throw new Error("A variável de ambiente E2B_API_KEY não foi configurada na Vercel.");
     }
-  }
+    
+    const response = await fetch("https://api.e2b.dev/instances", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${e2bApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        template: "code-interpreter-v1",
+      }),
+    });
 
-  return VercelSandbox.create(buildCreateConfig(state, options));
-}
+    if (!response.ok) {
+      throw new Error(`Falha ao criar microVM na E2B: ${response.statusText}`);
+    }
 
-/**
- * Connect to the Vercel-backed cloud sandbox based on the provided state.
- *
- * - If `sandboxName` is present, reconnects to the named persistent sandbox
- * - If `snapshotId` is present without `sandboxName`, restores from a legacy snapshot
- * - If `source` is present, creates a new sandbox and prepares the repo
- * - Otherwise, creates an empty sandbox
- */
-export async function connectVercel(
-  state: VercelState,
-  options?: ConnectOptions,
-): Promise<Sandbox> {
-  const sandboxName = getSandboxName(state);
+    const data = await response.json();
+    return data.instanceID; // ID único da máquina virtual persistente
+  };
 
-  if (sandboxName) {
-    return connectNamedSandbox(state, options);
-  }
+  // Inicializa a máquina virtual externa de forma lazy ou síncrona
+  let instanceId: string | null = null;
 
-  return VercelSandbox.create(buildCreateConfig(state, options));
+  const ensureInstance = async () => {
+    if (!instanceId) {
+      instanceId = await initInstance();
+    }
+    return instanceId;
+  };
+
+  // 2. Retornamos os Hooks mapeados para a máquina externa com permissão de escrita total
+  return {
+    executeBash: async (command: string) => {
+      const id = await ensureInstance();
+      
+      const response = await fetch(`https://api.e2b.dev/instances/${id}/commands`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${e2bApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ command }),
+      });
+
+      const result = await response.json();
+      return {
+        stdout: result.stdout || "",
+        stderr: result.stderr || "",
+        exitCode: result.exitCode ?? 0,
+      };
+    },
+
+    readFiles: async (pattern: string) => {
+      const id = await ensureInstance();
+      // Executa um comando bash interno seguro para ler a estrutura de arquivos do contêiner
+      const response = await fetch(`https://api.e2b.dev/instances/${id}/commands`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${e2bApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ command: `cat ${pattern}` }),
+      });
+      const result = await response.json();
+      return [{ path: pattern, content: result.stdout || "" }];
+    },
+
+    writeFiles: async (files: Array<{ path: string; content: string }>) => {
+      const id = await ensureInstance();
+      for (const file of files) {
+        // Injeta o arquivo diretamente dentro do sistema de arquivos gravável da máquina remota
+        await fetch(`https://api.e2b.dev/instances/${id}/commands`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${e2bApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            command: `mkdir -p $(dirname ${file.path}) && cat << 'EOF' > ${file.path}\n${file.content}\nEOF` 
+          }),
+        });
+      }
+    },
+  };
 }
